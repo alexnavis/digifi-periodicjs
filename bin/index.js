@@ -15,31 +15,30 @@ program
   .option('-a, --all', 'all environments');
 
 
-var run_cmd = function(cmd, args, callback, env) {
+var run_cmd = function (cmd, args, callback, env, attach = false) {
   var spawn = require('child_process').spawn;
-
-  if (env) {
-    child = spawn(cmd, args, env);
+  var options = [cmd, args, {
+    env
+  }];
+  if (attach === true) {
+    options[2].stdio = [process.stdin, process.stdout, process.stderr];
+    child = spawn(...options);
   } else {
-    child = spawn(cmd, args);
+    child = spawn(...options);
+    child.stdout.on('error', err => {
+      console.error(err);
+      process.exit(1);
+    })
+      .on('data', data => {
+        console.log(data.toString());
+      });
   }
-
-  child.stdout.on('error', function(err) {
-    console.error(err);
-    process.exit(0);
-  });
-
-  child.stdout.on('data', function(buffer) {
-    console.log(buffer.toString());
-  });
-
-  child.stderr.on('data', function(buffer) {
-    console.error(buffer.toString());
-  });
-
-  child.on('exit', function() {
+  child.on('exit', () => {
     callback(null, 'command run: ' + cmd + ' ' + args);
     process.exit(0);
+  });
+  process.on('exit', () => {
+    child.kill();
   });
 };
 
@@ -80,7 +79,7 @@ function extension(ext, func, args) {
 function repl(args) {
   return new Promise((resolve, reject) => {
     try {
-      run_cmd('node', [path.join(process_dir, 'index.js'), '--cli', '--repl', ], function(err, text) { console.log(text.green.underline) });
+      run_cmd('node', [path.join(process_dir, 'index.js'), '--cli', '--repl', ], function(err, text) { console.log(text.green.underline) }, undefined, true);
       return resolve(true);
     } catch (err) {
       return reject();
@@ -182,7 +181,7 @@ function createConfig(type, name, environment, filepath) {
     try {
       run_cmd('node', [path.join(process_dir, 'index.js'),
         '--cli',
-        '--createExtension',
+        '--createConfig',
         `--name=${name}`,
         `--type=${type}`,
         `--environment=${environment}`,
@@ -213,7 +212,7 @@ function addConfig(filepath) {
 function removeConfig(id) {
   return new Promise((resolve, reject) => {
     try {
-      run_cmd('node', [path.join(process_dir, 'index.js'), '--cli', '--addConfig', `--id=${id}`, ], function(err, text) {
+      run_cmd('node', [path.join(process_dir, 'index.js'), '--cli', '--removeConfig', `--id=${id}`, ], function(err, text) {
         console.log(text.green.underline);
       });
       return resolve(true);
@@ -225,6 +224,8 @@ function removeConfig(id) {
 
 program
   .command('setup [name]')
+  .alias('init')
+  .alias('s')
   .description('create a new periodic application')
   .action(function(name) {
     try {
@@ -237,6 +238,7 @@ program
 
 program
   .command('repl')
+  .alias('r')
   .description('start the periodic interactive shell')
   .action(function() {
     try {
@@ -249,6 +251,7 @@ program
 
 program
   .command('extension <ext> <func> [args]')
+  .alias('ext')
   .description('execute mounted extension asynchronous task')
   .action(function(ext, func, args) {
     try {
@@ -262,6 +265,7 @@ program
 
 program
   .command('container <name> <func> [args]')
+  .alias('con')
   .description('execute mounted container asynchronous task')
   .action(function(name, func, args) {
     try {
@@ -288,6 +292,8 @@ program
 
 program
   .command('createContainer <name>')
+  .alias('createcontainer')
+  .alias('ccn')
   .description('create a new container')
   .action(function(name) {
     try {
@@ -299,6 +305,8 @@ program
   });
 program
   .command('createExtension <name>')
+  .alias('createextension')
+  .alias('cex')
   .description('create a new extension')
   .action(function(name) {
     try {
@@ -310,6 +318,8 @@ program
   });
 program
   .command('addExtension <name>')
+  .alias('addextension')
+  .alias('aex')
   .description('add an extension to the extension database')
   .action(function(name) {
     try {
@@ -321,6 +331,8 @@ program
   });
 program
   .command('removeExtension <name>')
+  .alias('removeextension')
+  .alias('rex')
   .description('remove an extension from the extension database')
   .action(function(name) {
     try {
@@ -333,6 +345,7 @@ program
 
 program
   .command('createConfig <type> <name> <environment> <filepath>')
+  .alias('cco')
   .description('create a new Config')
   .action(function(type, name, environment, filepath) {
     try {
@@ -345,6 +358,7 @@ program
 
 program
   .command('addConfig <filepath>')
+  .alias('aco')
   .description('add an application configuration to the configuration database')
   .action(function(filepath) {
     try {
@@ -356,6 +370,7 @@ program
   });
 program
   .command('removeConfig <id>')
+  .alias('rco')
   .description('remove an application configuration from the configuration database')
   .action(function(id) {
     try {
